@@ -177,6 +177,9 @@ uv run bareloop
 Press `Enter` to send, `Esc` + `Enter` or `Ctrl` + `J` to insert a newline, and enter `q`,
 `quit`, or `exit` to stop.
 
+Enter `/clear` to clear the conversation history while keeping the initial system prompt and
+current mode, without restarting the CLI.
+
 ### Run interactively in PyCharm
 
 BareLoop uses `prompt_toolkit`, so its Run console needs terminal emulation for interactive input and
@@ -274,25 +277,25 @@ Use repeatable `--model MODEL_ID` arguments to select an explicit compatibility 
 `evals/model-pricing.example.yaml` and enter verified prices first. Missing Provider usage or prices
 remain unavailable rather than being estimated.
 
-Each run directory contains `report.json`, `runs.csv`, and a self-contained `report.html` with
-inline SVG charts. `task_success_rate` measures deterministic task completion;
-`harness_integrity_rate` separately measures internal and containment stability. Reports classify
-Provider errors, invalid Tool calls, round exhaustion, safety violations, harness errors, and
-recovered Tool errors. Five repetitions are exploratory, so p95 is not a production SLO.
+The evaluation suite runs across 6 real-world scenarios (basic writes, in-place editing, nested search, multi-file updates, error recovery, and sandbox path containment) to assess three core capabilities:
+- **Correctness & Safety**: Exact file-state matching and sandbox escape prevention.
+- **Reliability & Resilience**: Valid tool usage and autonomous recovery from tool errors.
+- **Efficiency & Cost**: Response latency, round counts, token usage, and dollar costs.
 
-Compare with a prior immutable report using `--baseline PATH/report.json`. Live artifacts remain
-under ignored `.bareloop/`; promoting a baseline is an explicit reviewed action.
+Each run automatically generates an interactive `report.html` (with inline charts), `report.json`, and `runs.csv`, and supports `--baseline` regression comparisons.
 
-To run the suite and refresh the README telemetry table and SVG chart in one command (requires the
-configured Provider models), use:
+### Third-party Benchmark: SWE-bench Adapter
+
+BareLoop provides an official-spec SWE-bench / SWE-bench Lite adapter. It consumes standard issue datasets, executes the BareLoop agent loop across isolated git workspaces, and outputs standard `predictions.jsonl` containing the `instance_id` and the extracted unified git `model_patch`:
 
 ```bash
-./scripts/update-telemetry-dashboard.sh
+uv run python -m bareloop.eval.swebench \
+  --dataset-path evals/swebench/sample_instances.jsonl \
+  --repo-dir /path/to/target-repo \
+  --output-dir .bareloop/eval/swebench
 ```
 
-The command writes suite-local `telemetry.jsonl` next to the eval report, then updates the marked
-dashboard block and `docs/assets/telemetry-dashboard.svg`. Set `REPETITIONS` or `OUTPUT_DIR` to
-override the defaults.
+The resulting `predictions.jsonl` directly plugs into the official SWE-bench docker harness (`swebench.harness.run_evaluation`) for third-party regression testing and leaderboard scoring.
 
 ## Project status
 
@@ -305,24 +308,3 @@ the source and tests as the current contract.
 
 BareLoop is released under the [MIT License](LICENSE).
 
-<!-- telemetry-dashboard:start -->
-### Runtime telemetry
-
-![Runtime telemetry dashboard](docs/assets/telemetry-dashboard.svg)
-
-| Metric | Value |
-| --- | --- |
-| Run count | 90 |
-| Completion rate | 66.7% |
-| Provider success rate | 86.8% |
-| Provider latency (mean / P50 / P95) | 1045.9 / 987.4 / 2065.8 ms |
-| Token usage (runs with provider usage) | 60 |
-| Input / output / total tokens | 173336 / 10927 / 184263 |
-| Tool calls (success rate) | 162 (87.0%) |
-| Tool errors / blocked / invalid | 11 / 10 / 0 |
-| Security blocks / safety violations | 10 / 0 |
-| Terminations | completed: 60, provider_error: 30 |
-| Last updated | 2026-09-13T12:52:09.615382+00:00 |
-
-_Generated from `.bareloop/eval/runs/20260913T124358Z/telemetry.jsonl`. Token totals include only records with provider-reported usage._
-<!-- telemetry-dashboard:end -->

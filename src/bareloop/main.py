@@ -41,7 +41,7 @@ from bareloop.settings import (  # noqa: E402
     WORKDIR,
     DEFAUlT_MODEL,  # noqa: F401
 )
-from bareloop.skills import _scan_skills, list_skills  # noqa: E402
+from bareloop.skills import SKILL_REGISTRY, _scan_skills, list_skills  # noqa: E402
 from bareloop.trace import TraceWriter  # noqa: E402
 from bareloop.utils import format_team_events  # noqa: E402
 
@@ -78,6 +78,27 @@ def build_system() -> str:
 
         如果工作目录中没有用户需要的普通文件，可以查找工作区之外的目录。
         """
+
+
+def format_cli_help() -> str:
+    skill_word = "skill" if len(SKILL_REGISTRY) == 1 else "skills"
+    return "\n".join(
+        [
+            "Available slash commands:",
+            "  /mode   Toggle Normal / Goal execution mode",
+            "  /clear  Reset conversation context",
+            "  /help   Show this help message",
+            "  q, quit, exit   Exit the agent session",
+            "",
+            "Keyboard shortcuts:",
+            "  Enter          Send message",
+            "  Esc+Enter      Insert newline",
+            "  Ctrl+J         Insert newline",
+            "",
+            f"Workspace: {WORKDIR}",
+            f"Loaded skills: {len(SKILL_REGISTRY)} {skill_word}",
+        ]
+    )
 
 
 async def wait_for_cli_event(
@@ -127,10 +148,15 @@ async def _wait_for_cli_event(selected_mode: AgentMode) -> tuple[str, str | None
             if new_mode is not None:
                 selected_mode = new_mode
             return "next", None, selected_mode
+        if content == "/help":
+            print(format_cli_help())
+            return "next", None, selected_mode
     except (EOFError, KeyboardInterrupt):
         return "quit", None, selected_mode
     if content in {"quit", "q", "exit"}:
         return "quit", None, selected_mode
+    if content == "/clear":
+        return "clear", None, selected_mode
     return "user", content, selected_mode
 
 
@@ -157,6 +183,11 @@ def create_session() -> None:
                     goal_controller.leave_goal_mode()
 
             if kind == "next":
+                continue
+            if kind == "clear":
+                with agent_lock:
+                    del messages[1:]
+                print("Conversation cleared. Start a new topic.\n")
                 continue
             if kind == "user":
                 tw.write(event_type="用户输入", data=input_prompt)

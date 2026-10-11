@@ -257,24 +257,25 @@ uv run python -m bareloop.eval \
 `evals/model-pricing.example.yaml` 并填入已核实价格，再传入 `--pricing`。Token 必须来自
 Provider usage，缺失 usage 或价格时明确显示 unavailable，不使用估算值冒充正式数据。
 
-每次运行生成 `report.json`、`runs.csv` 和包含内联 SVG 统计图的独立 `report.html`。
-`task_success_rate` 衡量确定性任务完成情况，`harness_integrity_rate` 单独衡量内部执行与
-workspace containment 稳定性。报告区分 Provider 错误、无效 Tool 调用、轮数耗尽、安全
-违规、Harness 内部错误以及 Tool 错误后的恢复。五次重复属于探索性样本，p95 不能作为
-生产 SLO。
+评测套件通过 6 个真实场景（单步写入、就地修改、深层查找、多文件协同、报错自愈及沙箱越界拦截），综合度量三个核心维度：
+- **任务正确与安全**：最终文件产物是否精确达标，沙箱越界是否被有效阻断；
+- **稳定性与容错**：工具调用合法性、遇到 Tool 报错时的自主恢复能力；
+- **效率与开销**：响应延迟、交互轮数、Token 消耗与美金成本。
 
-使用 `--baseline PATH/report.json` 可与历史报告比较。真实运行产物保存在 Git 忽略的
-`.bareloop/` 下，baseline 只应在人工审查后显式提升。
+运行后会自动生成包含可视化图表的独立 `report.html`、`report.json` 和 `runs.csv`，并支持通过 `--baseline` 进行版本回归比对。
 
-要一键运行完整 Suite，并自动刷新 README telemetry 表格和 SVG 图表（需要已配置的 Provider
-模型），执行：
+### 第三方基准评测：SWE-bench 适配器
+
+BareLoop 提供了符合官方规范的 SWE-bench / SWE-bench Lite 评测套件，可直接读取标准 Issue 数据集并在隔离代码仓库中派发 Agent 会话，最终输出标准的 `predictions.jsonl`（包含 `instance_id` 与生成的 unified git patch）：
 
 ```bash
-./scripts/update-telemetry-dashboard.sh
+uv run python -m bareloop.eval.swebench \
+  --dataset-path evals/swebench/sample_instances.jsonl \
+  --repo-dir /path/to/target-repo \
+  --output-dir .bareloop/eval/swebench
 ```
 
-脚本会把本次 Suite 的 `telemetry.jsonl` 写在评测报告目录旁，再更新 README 中的标记区块和
-`docs/assets/telemetry-dashboard.svg`。可通过 `REPETITIONS` 或 `OUTPUT_DIR` 覆盖默认值。
+生成后的 `predictions.jsonl` 可无缝接入 SWE-bench 官方评测 harness (`swebench.harness.run_evaluation`) 进行 Docker 独立单测验证和打榜评分。
 
 ## 项目状态
 
@@ -286,24 +287,3 @@ Public API 稳定性仍在开发中。现阶段请以源码和测试作为行为
 
 BareLoop 使用 [MIT License](LICENSE)。
 
-<!-- telemetry-dashboard:start -->
-### Runtime telemetry
-
-![Runtime telemetry dashboard](docs/assets/telemetry-dashboard.svg)
-
-| Metric | Value |
-| --- | --- |
-| Run count | 0 |
-| Completion rate | N/A |
-| Provider success rate | N/A |
-| Provider latency (mean / P50 / P95) | N/A |
-| Token usage (runs with provider usage) | 0 |
-| Input / output / total tokens | 0 / 0 / 0 |
-| Tool calls (success rate) | 0 (N/A) |
-| Tool errors / blocked / invalid | 0 / 0 / 0 |
-| Security blocks / safety violations | 0 / 0 |
-| Terminations | N/A |
-| Last updated | N/A |
-
-_No telemetry runs recorded. Run the dashboard command to populate this section._
-<!-- telemetry-dashboard:end -->
